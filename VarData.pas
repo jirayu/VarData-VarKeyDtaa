@@ -3,9 +3,9 @@ unit VarData;
 interface
 
 uses
-  System.Classes, System.SysUtils, System.Generics.Collections,
+  System.Classes, System.SysUtils, System.Generics.Collections, System.Generics.Defaults,
   System.Variants, System.SyncObjs, System.Rtti, System.TypInfo, DB,
-  DBIsamTb, Streamer, Converse;
+  Streamer, Converse;
 
 type
   TEachItem = procedure(const AKey: string; const AValue: Variant) of object;
@@ -27,8 +27,8 @@ type
     procedure Each(AProc: TEachItem);
     function  InsertSQL(TableName: String): String;
     function  ToStringList:TStringList;
+    function  HasKey(const AString:String):Boolean;
     procedure FromString(const AString: string);
-    procedure ExecParam(Params: TDBIsamParams);
     procedure UpdateTo(Field: TMemoField);
     procedure LoadFrom(Field: TMemoField);
     procedure Keep(Dataset: TDataset);
@@ -49,7 +49,18 @@ implementation
 constructor TVarDataStorage.Create;
 begin
   inherited Create;
-  FData := TDictionary<string, Variant>.Create;
+  FData := TDictionary<string, Variant>.Create(
+    TEqualityComparer<string>.Construct(
+      function(const Left, Right: string): Boolean
+      begin
+        Result := SameText(Left, Right);  // Case-insensitive comparison
+      end,
+      function(const Value: string): Integer
+      begin
+        Result := BobJenkinsHash(Pointer(LowerCase(Value))^, Length(Value) * SizeOf(Char), 0);  // Case-insensitive hash
+      end
+    )
+  );
   FCriticalSection := TCriticalSection.Create;
 end;
 
@@ -86,6 +97,11 @@ begin
   finally
     FCriticalSection.Leave;
   end;
+end;
+
+function TVarDataStorage.HasKey(const AString: String): Boolean;
+begin
+  Result := FData.ContainsKey(AString);
 end;
 
 procedure TVarDataStorage.SetVarData(const AKey: string; const AValue: Variant);
@@ -181,24 +197,6 @@ begin
   finally
     Fields.Free;
     Params.Free;
-  end;
-end;
-
-procedure TVarDataStorage.ExecParam(Params: TDBIsamParams);
-var
-  Key: string;
-  Value: Variant;
-begin
-  FCriticalSection.Enter;
-  try
-    for Key in FData.Keys do
-    begin
-      Value := GetVarData(Key);
-      if Params.FindParam(Key) <> nil then
-        Params.ParamByName(Key).Value := Value;
-    end;
-  finally
-    FCriticalSection.Leave;
   end;
 end;
 
