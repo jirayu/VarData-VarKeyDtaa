@@ -325,5 +325,5 @@ This component is **not thread-safe**. If you need to use it in a multi-threaded
 
 ## License
 
-[Add your license information here]
+MIT License for Delphi programmer to use on any project to avoid the use of stupid dictionary (old version for Delphi 2007 and below please contact me directly)
 
